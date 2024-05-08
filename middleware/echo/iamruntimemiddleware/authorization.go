@@ -26,6 +26,27 @@ func CheckAccess(c echo.Context, actions []*authorization.AccessRequestAction, o
 		switch {
 		case errors.Is(err, iamruntime.ErrTokenNotFound):
 			return echo.ErrBadRequest.WithInternal(err)
+		case errors.Is(err, iamruntime.ErrRuntimeNotFound),
+			errors.Is(err, iamruntime.ErrAccessCheckFailed),
+			errors.Is(err, iamruntime.ErrResourceIDActionPairsInvalid):
+			return echo.ErrInternalServerError.WithInternal(err)
+		case errors.Is(err, iamruntime.ErrAccessDenied):
+			return echo.ErrForbidden.WithInternal(err)
+		default:
+			return echo.ErrInternalServerError.WithInternal(fmt.Errorf("unknown error: %w", err))
+		}
+	}
+
+	return nil
+}
+
+// CheckAccessTo builds a check access request and executes it on the runtime in the provided context.
+// Arguments must be pairs of Resource ID and Role Actions.
+func CheckAccessTo(c echo.Context, resourceIDActionPairs ...string) error {
+	if err := iamruntime.ContextCheckAccessTo(c.Request().Context(), resourceIDActionPairs...); err != nil {
+		switch {
+		case errors.Is(err, iamruntime.ErrTokenNotFound):
+			return echo.ErrBadRequest.WithInternal(err)
 		case errors.Is(err, iamruntime.ErrRuntimeNotFound), errors.Is(err, iamruntime.ErrAccessCheckFailed):
 			return echo.ErrInternalServerError.WithInternal(err)
 		case errors.Is(err, iamruntime.ErrAccessDenied):

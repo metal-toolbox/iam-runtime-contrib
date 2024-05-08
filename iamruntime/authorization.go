@@ -38,6 +38,25 @@ func ContextCheckAccess(ctx context.Context, actions []*authorization.AccessRequ
 	return nil
 }
 
+// ContextCheckAccessTo builds a check access request and executes it on the runtime in the provided context.
+// Arguments must be pairs of Resource ID and Role Actions.
+func ContextCheckAccessTo(ctx context.Context, resourceIDActionPairs ...string) error {
+	if len(resourceIDActionPairs)%2 != 0 {
+		return fmt.Errorf("%w: invalid argument count", ErrResourceIDActionPairsInvalid)
+	}
+
+	var checkActions []*authorization.AccessRequestAction
+
+	for i := 0; i < len(resourceIDActionPairs); i += 2 {
+		checkActions = append(checkActions, &authorization.AccessRequestAction{
+			ResourceId: resourceIDActionPairs[i],
+			Action:     resourceIDActionPairs[i+1],
+		})
+	}
+
+	return ContextCheckAccess(ctx, checkActions)
+}
+
 // ContextCreateRelationships executes a create relationship request on the runtime in the context.
 // Context must have a runtime value.
 // The runtime must implement the iam-runtime's AuthorizationClient.

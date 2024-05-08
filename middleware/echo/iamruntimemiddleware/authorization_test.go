@@ -151,6 +151,119 @@ func TestCheckAccess(t *testing.T) {
 	}
 }
 
+func TestCheckAccessTo(t *testing.T) {
+	authsrv := testauth.NewServer(t)
+	t.Cleanup(authsrv.Stop)
+
+	testCases := []struct {
+		name               string
+		actions            []string
+		returnAccessResult authorization.CheckAccessResponse_Result
+		returnAccessError  error
+		expectCalled       map[string][]string
+		expectStatus       int
+		expectBody         map[string]any
+	}{
+		{
+			"permitted",
+			[]string{
+				"testten-abc123", "action_one",
+				"testten-abc123", "action_two",
+				"testten-def456", "action_one",
+			},
+			authorization.CheckAccessResponse_RESULT_ALLOWED,
+			nil,
+			map[string][]string{
+				"testten-abc123": {"action_one", "action_two"},
+				"testten-def456": {"action_one"},
+			},
+			http.StatusOK,
+			map[string]any{
+				"success": true,
+			},
+		},
+		{
+			"denied",
+			[]string{"testten-abc123", "action_one"},
+			authorization.CheckAccessResponse_RESULT_DENIED,
+			nil,
+			map[string][]string{"testten-abc123": {"action_one"}},
+			http.StatusForbidden,
+			map[string]any{
+				"message": "Forbidden",
+				"error":   "code=403, message=Forbidden, internal=iam-runtime error: access: denied",
+			},
+		},
+		{
+			"error",
+			[]string{"testten-abc123", "action_one"},
+			0,
+			grpc.ErrServerStopped,
+			map[string][]string{"testten-abc123": {"action_one"}},
+			http.StatusInternalServerError,
+			map[string]any{
+				"message": "Internal Server Error",
+				"error":   "code=500, message=Internal Server Error, internal=iam-runtime error: access: failed to check access: grpc: the server has been stopped",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			runtime := new(mockruntime.MockRuntime)
+
+			runtime.Mock.On("ValidateCredential", "some subject").Return(&authentication.ValidateCredentialResponse{
+				Result: authentication.ValidateCredentialResponse_RESULT_VALID,
+			}, nil)
+
+			runtime.Mock.On("CheckAccess", tc.expectCalled).Return(tc.returnAccessResult, tc.returnAccessError)
+
+			config := NewConfig().WithRuntime(runtime)
+
+			middleware, err := config.ToMiddleware()
+			require.NoError(t, err, "unexpected error building middleware")
+
+			engine := echo.New()
+
+			engine.Debug = true
+
+			engine.Use(middleware)
+
+			engine.GET("/test", func(c echo.Context) error {
+				if err := CheckAccessTo(c, tc.actions...); err != nil {
+					return err
+				}
+
+				return c.JSON(http.StatusOK, echo.Map{
+					"success": true,
+				})
+			})
+
+			ctx := context.Background()
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/test", nil)
+			require.NoError(t, err)
+
+			req.Header.Add("Authorization", "Bearer "+authsrv.TSignSubject(t, "some subject"))
+
+			resp := httptest.NewRecorder()
+
+			engine.ServeHTTP(resp, req)
+
+			runtime.Mock.AssertExpectations(t)
+
+			assert.Equal(t, tc.expectStatus, resp.Code, "unexpected status code returned")
+
+			var body map[string]any
+
+			err = json.Unmarshal(resp.Body.Bytes(), &body)
+			require.NoError(t, err, "unexpected error decoding body")
+
+			assert.Equal(t, tc.expectBody, body, "unexpected body returned")
+		})
+	}
+}
+
 func TestCreateRelationships(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -330,6 +443,24 @@ func ExampleCheckAccess() {
 		}
 
 		if err := CheckAccess(c, check); err != nil {
+			return err
+		}
+
+		return c.String(http.StatusOK, "user has access to resource")
+	})
+
+	_ = http.ListenAndServe(":8080", engine)
+}
+
+func ExampleCheckAccessTo() {
+	middleware, _ := NewConfig().ToMiddleware()
+
+	engine := echo.New()
+
+	engine.Use(middleware)
+
+	engine.GET("/resources/:resource_id", func(c echo.Context) error {
+		if err := CheckAccessTo(c, c.Param("resource_id"), "resource_get"); err != nil {
 			return err
 		}
 
