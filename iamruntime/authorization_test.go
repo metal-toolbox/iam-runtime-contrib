@@ -107,6 +107,79 @@ func TestContextCheckAccess(t *testing.T) {
 	}
 }
 
+func TestContextCheckAccessTo(t *testing.T) {
+	authsrv := testauth.NewServer(t)
+	t.Cleanup(authsrv.Stop)
+
+	testCases := []struct {
+		name               string
+		actions            []string
+		returnAccessResult authorization.CheckAccessResponse_Result
+		returnAccessError  error
+		expectCalled       map[string][]string
+		expectError        error
+	}{
+		{
+			"permitted",
+			[]string{
+				"testten-abc123", "action_one",
+				"testten-abc123", "action_two",
+				"testten-def456", "action_one",
+			},
+			authorization.CheckAccessResponse_RESULT_ALLOWED,
+			nil,
+			map[string][]string{
+				"testten-abc123": {"action_one", "action_two"},
+				"testten-def456": {"action_one"},
+			},
+			nil,
+		},
+		{
+			"denied",
+			[]string{"testten-abc123", "action_one"},
+			authorization.CheckAccessResponse_RESULT_DENIED,
+			nil,
+			map[string][]string{"testten-abc123": {"action_one"}},
+			ErrAccessDenied,
+		},
+		{
+			"error",
+			[]string{"testten-abc123", "action_one"},
+			0,
+			grpc.ErrServerStopped,
+			map[string][]string{"testten-abc123": {"action_one"}},
+			ErrAccessCheckFailed,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			runtime := new(mockruntime.MockRuntime)
+
+			runtime.Mock.On("CheckAccess", tc.expectCalled).Return(tc.returnAccessResult, tc.returnAccessError)
+
+			token, _, err := jwt.NewParser().ParseUnverified(authsrv.TSignSubject(t, "some subject"), jwt.MapClaims{})
+			require.NoError(t, err, "unexpected error creating jwt")
+
+			ctx := context.Background()
+
+			ctx = SetContextRuntime(ctx, runtime)
+			ctx = SetContextToken(ctx, token)
+
+			err = ContextCheckAccessTo(ctx, tc.actions...)
+
+			if tc.expectError != nil {
+				require.Error(t, err, "expected error to be returned")
+				assert.ErrorIs(t, err, tc.expectError, "unexpected error returned")
+			} else {
+				assert.NoError(t, err, "expected no error to be returned")
+			}
+
+			runtime.Mock.AssertExpectations(t)
+		})
+	}
+}
+
 func TestContextCreateRelationships(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -254,6 +327,19 @@ func ExampleContextCheckAccess() {
 	}
 
 	if err := ContextCheckAccess(ctx, check); err != nil {
+		panic("failed to check access: " + err.Error())
+	}
+
+	fmt.Println("Token has access to resource!")
+}
+
+func ExampleContextCheckAccessTo() {
+	runtime, _ := NewClient("unix:///tmp/runtime.sock")
+
+	ctx := SetContextRuntime(context.TODO(), runtime)
+	ctx = SetContextToken(ctx, &jwt.Token{Raw: "some token"})
+
+	if err := ContextCheckAccessTo(ctx, "resctyp-abc123", "resource_get"); err != nil {
 		panic("failed to check access: " + err.Error())
 	}
 

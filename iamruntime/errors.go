@@ -27,6 +27,9 @@ var (
 	// AccessError is the root error for all access related errors.
 	AccessError = fmt.Errorf("%w: access", Error) //nolint:revive,stylecheck // not returned directly, but used as a root error.
 
+	// ErrResourceIDActionPairsInvalid is returned when ContextCheckAccessTo has an invalid number of arguments.
+	ErrResourceIDActionPairsInvalid = fmt.Errorf("%w: ContextCheckAccessTo invalid Resource ID, Action argument pairs", AccessError)
+
 	// ErrAccessCheckFailed is the error returned when an access request failed to execute.
 	ErrAccessCheckFailed = fmt.Errorf("%w: failed to check access", AccessError)
 
