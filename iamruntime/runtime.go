@@ -22,8 +22,15 @@ type runtime struct {
 }
 
 // NewClient creates a new iam-runtime which implements all clients.
-func NewClient(socket string) (Runtime, error) {
-	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
+//
+// GRPC Insecure transport credentials are configured by default.
+// This may be overwritten by providing an alternative TransportCredentials dial option.
+func NewClient(target string, dialOpts ...grpc.DialOption) (Runtime, error) {
+	dialOpts = append([]grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}, dialOpts...)
+
+	conn, err := grpc.NewClient(target, dialOpts...)
 	if err != nil {
 		return nil, err
 	}
