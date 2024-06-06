@@ -4,6 +4,7 @@ import (
 	"github.com/metal-toolbox/iam-runtime/pkg/iam/runtime/authentication"
 	"github.com/metal-toolbox/iam-runtime/pkg/iam/runtime/authorization"
 	"github.com/metal-toolbox/iam-runtime/pkg/iam/runtime/identity"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -28,6 +29,7 @@ type runtime struct {
 func NewClient(target string, dialOpts ...grpc.DialOption) (Runtime, error) {
 	dialOpts = append([]grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	}, dialOpts...)
 
 	conn, err := grpc.NewClient(target, dialOpts...)
