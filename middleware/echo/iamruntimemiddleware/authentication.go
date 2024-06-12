@@ -1,6 +1,7 @@
 package iamruntimemiddleware
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -44,7 +45,12 @@ func setAuthenticationContext(c echo.Context) error {
 // ValidateCredential executes an access request on the runtime in the context with the provided actions.
 // If any error is returned, the error is converted to an echo error with a proper status code.
 func ValidateCredential(c echo.Context, in *authentication.ValidateCredentialRequest, opts ...grpc.CallOption) error {
-	if err := iamruntime.ContextValidateCredential(c.Request().Context(), in, opts...); err != nil {
+	return ContextValidateCredential(c.Request().Context(), in, opts...)
+}
+
+// ContextValidateCredential same as [ValidateCredential] except it works off a context.Context.
+func ContextValidateCredential(ctx context.Context, in *authentication.ValidateCredentialRequest, opts ...grpc.CallOption) error {
+	if err := iamruntime.ContextValidateCredential(ctx, in, opts...); err != nil {
 		switch {
 		case errors.Is(err, iamruntime.ErrTokenNotFound), errors.Is(err, iamruntime.ErrInvalidCredentials):
 			return echo.ErrUnauthorized.WithInternal(err)
