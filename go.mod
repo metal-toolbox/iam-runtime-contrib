@@ -9,7 +9,7 @@ require (
 	github.com/metal-toolbox/iam-runtime v0.4.1
 	github.com/stretchr/testify v1.9.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0
-	golang.org/x/oauth2 v0.22.0
+	golang.org/x/oauth2 v0.24.0
 	google.golang.org/grpc v1.65.0
 )
 
