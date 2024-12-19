@@ -1,6 +1,6 @@
 module github.com/metal-toolbox/iam-runtime-contrib
 
-go 1.22.1
+go 1.23
 
 require (
 	github.com/go-jose/go-jose/v4 v4.0.4
