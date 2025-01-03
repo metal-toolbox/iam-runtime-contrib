@@ -50,4 +50,7 @@ var (
 
 	// ErrAccessTokenInvalid is the error returned when an access token returned is not valid.
 	ErrAccessTokenInvalid = fmt.Errorf("%w: invalid access token", IdentityError)
+
+	// ErrNotReady is returned when an individual health check is not ready.
+	ErrNotReady = fmt.Errorf("%w: runtime not ready", Error)
 )
