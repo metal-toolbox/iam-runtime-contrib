@@ -3,7 +3,7 @@ module github.com/metal-toolbox/iam-runtime-contrib
 go 1.23.0
 
 require (
-	github.com/go-jose/go-jose/v4 v4.0.5
+	github.com/go-jose/go-jose/v4 v4.1.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/metal-toolbox/iam-runtime v0.4.1
